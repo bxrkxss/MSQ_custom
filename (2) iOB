@@ -1,0 +1,92 @@
+//@version=4
+//@borkiss
+study("borkiss iob", overlay=true)
+
+//Inputs
+highBarNext = high
+lowBarNext = low
+highBarPrevious = high[2]
+lowBarPrevious = low[2]
+openBarPrevious = open[2]
+closeBarPrevious = close[2]
+openBarCurrent = open[1]
+closeBarCurrent = close[1]
+int offset = 2 
+bar_index_ = bar_index[offset]
+bearCandlecolor = input(defval=#a86161, title="Bearish OB Candle", type=input.color,   inline='customcolor', group="Chart Customization Candles")
+bullcandlecolor  = input(defval=#004d40, title="Bullish OB Candle",  type=input.color,   inline='customcolor', group="Chart Customization Candles")
+adtranspCandle  = input(defval=65,          title="Candle Transparency", type=input.integer, minval=1, maxval=100, group="Chart Customization Candles")
+bearboxcolor = input(defval=#a86161,   title="Bearish OB Box", type=input.color,   inline='customcolor', group="Chart Customization Box")
+bullboxcolor  = input(defval=#004d40, title="Bullish OB Box",  type=input.color,   inline='customcolor', group="Chart Customization Box")
+showOBboxes = input(true, title="Show OB Boxes",group="Chart Customization Box")
+adtransp  = input(defval=65,          title="Box Transparency", type=input.integer, minval=1, maxval=100, group="Chart Customization Box")
+adboxcount = input(defval=50,  title="Maximum Box Displayed",            type=input.integer, minval=1, maxval=200, group="Chart Customization")
+
+
+
+//If the Candle in index of 1 (the candle being detected as engulfing and imbalanced) and the next candle does not fill the imbalance, then a signal is generated. 
+bullishEngulfing = openBarCurrent <= closeBarPrevious and openBarCurrent < openBarPrevious and 
+   closeBarCurrent > openBarPrevious and lowBarNext > highBarPrevious
+bearishEngulfing = openBarCurrent >= closeBarPrevious and openBarCurrent > openBarPrevious and 
+   closeBarCurrent < openBarPrevious and highBarNext < lowBarPrevious
+
+//Plot OB Candles
+barcolor(bullishEngulfing? color.new(bullcandlecolor,adtranspCandle) : na, offset=-2)
+barcolor(bearishEngulfing? color.new(bearCandlecolor,adtranspCandle) : na, offset=-2)
+
+
+//Box Variables
+var box[] bearboxarray = array.new_box()
+var box[] bullboxarray = array.new_box()
+
+//Box Color Variables
+var color adbearboxcolor       = color.new(bearboxcolor, adtransp)
+var color adbullboxcolor       = color.new(bullboxcolor,  adtransp)
+var color adbearborderboxcolor = color.new(bearboxcolor, adtransp)
+var color adbullborderboxcolor = color.new(bullboxcolor,  adtransp)
+
+//Bearish OB Box Calculation
+f_choppedoffbear(bearboxarray) =>
+    if (array.size(bearboxarray) > 0)
+        for i = array.size(bearboxarray) - 1 to 0
+            cutbox       = array.get(bearboxarray, i)
+            boxlowzone   = box.get_bottom(cutbox)
+            boxhighzone  = box.get_top(cutbox)
+            boxrightzone = box.get_right(cutbox)
+            if (na or (bar_index - 1 == boxrightzone and not ((high > boxlowzone and low < boxlowzone) or (high > boxhighzone and low < boxhighzone))))
+                box.set_right(array.get(bearboxarray, i), bar_index)
+
+//Bearish OB Box Plotting
+if (bearishEngulfing and showOBboxes)
+    boxhighzone = high[2] > high[1] ? high[2] : high [1]
+    boxlowzone  = open[2]
+    bearbox     = box.new(bar_index_, boxhighzone, bar_index, boxlowzone, border_color=adbearborderboxcolor, border_style=line.style_dashed, bgcolor=adbearboxcolor)
+    if (array.size(bearboxarray) > adboxcount)
+        box.delete(array.shift(bearboxarray))
+    array.push(bearboxarray, bearbox)
+
+f_choppedoffbear(bearboxarray)    
+
+//Bullish OB Box Calculation
+
+f_choppedoffbull(bullboxarray) =>
+    if (array.size(bullboxarray) > 0)
+        for i = array.size(bullboxarray) - 1 to 0
+            cutbox       = array.get(bullboxarray, i)
+            boxlowzone   = box.get_bottom(cutbox)
+            boxhighzone  = box.get_top(cutbox)
+            boxrightzone = box.get_right(cutbox)
+            if (na or (bar_index - 1 == boxrightzone and not ((high > boxlowzone and low < boxlowzone) or (high > boxhighzone and low < boxhighzone))))
+                box.set_right(array.get(bullboxarray, i), bar_index)
+
+//Bullish OB Box Plotting
+
+if (bullishEngulfing and showOBboxes)
+    boxlowzone  = low[1] < low[2] ? low [1] : low [2]
+    boxhighzone = open[2]
+    bullbox     = box.new(bar_index_, boxhighzone, bar_index, boxlowzone, border_color=adbullborderboxcolor, border_style=line.style_dashed, bgcolor=adbullboxcolor)
+    if (array.size(bullboxarray) > adboxcount)
+        box.delete(array.shift(bullboxarray))
+    array.push(bullboxarray, bullbox)
+
+f_choppedoffbull(bullboxarray)
